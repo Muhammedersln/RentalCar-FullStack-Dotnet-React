@@ -1,18 +1,17 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { carApi } from '../../services/api';
-import { Car } from '../../types';
-import { Box, Typography, CircularProgress, Grid, Card, CardContent, CardActions, Button, Chip } from '@mui/material';
-import CarModal from '../../components/CarModal';
-import { DirectionsCar, AttachMoney, Event } from '@mui/icons-material';
+import { useState, useEffect } from 'react';
+import { carApi } from '@/services/api';
+import { Car } from '@/types';
+import CarCard from "@/components/CarCard"
+import CarModal from '@/components/CarModal';
 
 export default function CarsPage() {
   const [cars, setCars] = useState<Car[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedCar, setSelectedCar] = useState<Car | null>(null);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filterBrand, setFilterBrand] = useState('');
 
   useEffect(() => {
     fetchCars();
@@ -22,106 +21,94 @@ export default function CarsPage() {
     try {
       const data = await carApi.getAll();
       setCars(data);
-    } catch {
-      setError('Failed to fetch cars');
+    } catch (error) {
+      console.error('Error fetching cars:', error);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleAddCar = () => {
-    setSelectedCar(null);
-    setIsModalOpen(true);
-  };
+  const filteredCars = cars.filter(car => {
+    const matchesSearch = car.model.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         car.brand.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesBrand = filterBrand ? car.brand === filterBrand : true;
+    return matchesSearch && matchesBrand;
+  });
 
-  const handleEditCar = (car: Car) => {
-    setSelectedCar(car);
-    setIsModalOpen(true);
-  };
-
-  if (loading) return (
-    <Box className="flex justify-center items-center min-h-[50vh]">
-      <CircularProgress className="text-primary" />
-    </Box>
-  );
-
-  if (error) return (
-    <Box className="text-center p-8">
-      <Typography color="error" className="text-lg">
-        {error}
-      </Typography>
-      <Button 
-        onClick={fetchCars}
-        className="mt-4 bg-gradient-to-r from-primary to-secondary text-white hover:from-primary-light hover:to-secondary-light"
-      >
-        Retry
-      </Button>
-    </Box>
-  );
+  const uniqueBrands = Array.from(new Set(cars.map(car => car.brand)));
 
   return (
-    <Box className="animate-fade-in">
-      <Box className="flex justify-between items-center mb-6">
-        <Typography variant="h4" className="font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
-          Available Cars
-        </Typography>
-        <Button
-          variant="contained"
-          onClick={handleAddCar}
-          className="bg-gradient-to-r from-primary to-secondary hover:from-primary-light hover:to-secondary-light text-white transition-all duration-300 transform hover:scale-105"
-        >
-          Add New Car
-        </Button>
-      </Box>
+    <div className="min-h-screen bg-surface animate-fade-in">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Header */}
+        <div className="flex flex-col md:flex-row justify-between items-center mb-8 gap-4">
+          <h1 className="text-3xl font-bold">
+            Araç <span className="text-primary">Kataloğu</span>
+          </h1>
+          
+          <div className="flex flex-col sm:flex-row gap-4 w-full md:w-auto">
+            <input
+              type="text"
+              placeholder="Araç ara..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="px-4 py-2 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
+            />
+            
+            <select
+              value={filterBrand}
+              onChange={(e) => setFilterBrand(e.target.value)}
+              className="px-4 py-2 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
+            >
+              <option value="">Tüm Markalar</option>
+              {uniqueBrands.map(brand => (
+                <option key={brand} value={brand}>{brand}</option>
+              ))}
+            </select>
+          </div>
+        </div>
 
-      <Grid container spacing={3}>
-        {cars.map((car) => (
-          <Grid item xs={12} sm={6} md={4} key={car.id} className="animate-slide-up">
-            <Card className="h-full flex flex-col hover:shadow-hover transition-shadow duration-300">
-              <CardContent className="flex-grow">
-                <Typography variant="h6" className="font-bold mb-2">
-                  {car.brand} {car.model}
-                </Typography>
-                <Box className="space-y-2">
-                  <Box className="flex items-center gap-2">
-                    <Event className="text-primary" />
-                    <Typography>{car.year}</Typography>
-                  </Box>
-                  <Box className="flex items-center gap-2">
-                    <DirectionsCar className="text-primary" />
-                    <Typography>{car.licensePlate}</Typography>
-                  </Box>
-                  <Box className="flex items-center gap-2">
-                    <AttachMoney className="text-primary" />
-                    <Typography>${car.dailyRate}/day</Typography>
-                  </Box>
-                  <Chip 
-                    label={car.isAvailable ? 'Available' : 'Not Available'}
-                    className={`mt-2 ${car.isAvailable ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}
-                    size="small"
-                  />
-                </Box>
-              </CardContent>
-              <CardActions className="bg-gray-50">
-                <Button
-                  fullWidth
-                  onClick={() => handleEditCar(car)}
-                  className="text-primary hover:bg-primary hover:text-white transition-colors"
-                >
-                  View Details
-                </Button>
-              </CardActions>
-            </Card>
-          </Grid>
-        ))}
-      </Grid>
+        {/* Cars Grid */}
+        {loading ? (
+          <div className="flex justify-center items-center min-h-[400px]">
+            <div className="animate-pulse-slow">
+              <svg className="w-12 h-12 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+              </svg>
+            </div>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            {filteredCars.map((car) => (
+              <CarCard
+                key={car.id}
+                car={car}
+                onClick={() => setSelectedCar(car)}
+              />
+            ))}
+          </div>
+        )}
 
+        {/* No Results */}
+        {!loading && filteredCars.length === 0 && (
+          <div className="text-center py-12">
+            <p className="text-gray-500 text-lg">
+              Araç bulunamadı. Lütfen farklı bir arama yapın.
+            </p>
+          </div>
+        )}
+      </div>
+
+      {/* Car Details Modal */}
       <CarModal
-        open={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
         car={selectedCar}
-        onSave={fetchCars}
+        open={!!selectedCar}
+        onClose={() => setSelectedCar(null)}
+        onSave={() => {
+          setSelectedCar(null);
+          fetchCars();
+        }}
       />
-    </Box>
+    </div>
   );
 } 
